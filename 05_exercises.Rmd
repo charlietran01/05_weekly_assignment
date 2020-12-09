@@ -83,11 +83,67 @@ Once your repository is created, you should always open your **project** rather 
 ## Warm-up exercises from tutorial
 
   1. Choose 2 graphs you have created for ANY assignment in this class and add interactivity using the `ggplotly()` function.
-  
+```{r eval=FALSE}
+garden_graph <- garden_harvest %>% 
+  filter(vegetable == "tomatoes") %>% 
+  group_by(variety, date) %>%  
+  summarise(total_day = sum(weight)) %>% 
+  top_n(-1, date) %>% 
+  ggplot(aes(y = fct_reorder(variety, total_day), x = total_day , fill = variety))+
+  geom_col()+
+  theme(legend.position = "none")+
+  labs(title = "First Harvest for Different Tomatoes Varieties", y= "", x = "Weight (g)")
+
+ggplotly(garden_graph)
+
+```
+
+```{r eval=FALSE}
+states_map <- map_data("state")
+
+current_covid19 <- covid19 %>% 
+  filter(date == as.Date("2020-11-26")) %>% 
+  mutate(state_name = str_to_lower(state))
+
+covid19map <- current_covid19 %>% 
+  ggplot() +
+  geom_map(map = states_map,
+           aes(map_id = state_name,
+               fill = cases)) +
+  scale_fill_viridis_c(option = "plasma")+
+  expand_limits(x = states_map$long, y = states_map$lat) +
+  theme_map() +
+  theme(legend.background = element_blank())+
+  labs(title = "Cummulative COVID-19 Cases",
+       fill = "# of Cases",
+       caption = "Created by Charlie Tran")
+
+ggplotly(covid19map)
+
+```
+
   2. Use animation to tell an interesting story with the `small_trains` dataset that contains data from the SNCF (National Society of French Railways). These are Tidy Tuesday data! Read more about it [here](https://github.com/rfordatascience/tidytuesday/tree/master/data/2019/2019-02-26).
 
-```{r}
+```{r eval=FALSE}
+departure_late <- small_trains %>% 
+  filter(year == 2017, service == "International") %>% 
+  group_by(month, departure_station) %>% 
+  summarise(total_late = sum(num_arriving_late))
 
+departure_late %>% 
+  ggplot(aes(x = total_late,
+             y = departure_station))+
+  geom_col()+
+  labs(title = "Total Number of late Ariivals for each Departure Station",
+       x = "Total Passengers Arrive Late",
+       y = "Departure Station",
+       subtitle = "{closest_state}")+
+  transition_states(month)+
+  anim_save("departure_late.gif")
+```
+
+```{r echo=FALSE}
+  knitr::include_graphics("departure_late.gif")
 ```
 
 ## Garden data
@@ -100,15 +156,33 @@ Once your repository is created, you should always open your **project** rather 
 
 I have started the code for you below. The `complete()` function creates a row for all unique `date`/`variety` combinations. If a variety is not harvested on one of the harvest dates in the dataset, it is filled with a value of 0.
 
-```{r}
-garden_harvest %>% 
+```{r eval=FALSE}
+tomatoes <- garden_harvest %>% 
   filter(vegetable == "tomatoes") %>% 
   group_by(date, variety) %>% 
   summarize(daily_harvest_lb = sum(weight)*0.00220462) %>% 
   ungroup() %>% 
-  complete(variety, date, fill = list(daily_harvest_lb = 0))
-```
+  complete(variety, date, fill = list(daily_harvest_lb = 0)) 
 
+cummulative <- tomatoes %>% 
+  group_by(variety) %>%
+  summarise(x = sum(daily_harvest_lb)) %>% 
+  arrange(desc(x))
+
+tomatoes %>% 
+  ggplot(aes(x = date,
+             y = daily_harvest_lb))+
+  geom_area(aes(fill = fct_reorder(variety, daily_harvest_lb)))+
+  labs(title = "Daily Harvest (lbs)",
+       x = "",
+       y = "")+
+  scale_fill_discrete(name = "Variety")+
+  transition_reveal(date)+
+  anim_save("tomatoes.gif")
+```
+```{r echo=FALSE}
+  knitr::include_graphics("tomatoes.gif")
+```
 
 ## Maps, animation, and movement!
 
@@ -121,13 +195,42 @@ garden_harvest %>%
   * Show the time in the subtitle.  
   * CHALLENGE: use the `ggimage` package and `geom_image` to add a bike image instead of a red point. You can use [this](https://raw.githubusercontent.com/llendway/animation_and_interactivity/master/bike.png) image. See [here](https://goodekat.github.io/presentations/2019-isugg-gganimate-spooky/slides.html#35) for an example. 
   * Add something of your own! And comment on if you prefer this to the static map and why or why not.
+
+```{r eval=FALSE}
+mallorca_bike_day7 <- mallorca_bike_day7 %>% 
+  replace_na(list(speed = 0)) 
+
+bikepath <- get_stamenmap(
+    bbox = c(left = 2.35, bottom = 39.5, right = 2.6, top = 39.75), 
+    maptype = "terrain",
+    zoom = 10)
+
+  ggmap(bikepath) + 
+  geom_path(data = mallorca_bike_day7, 
+             aes(x = lon, y = lat, color = ele), 
+             size = 1)+
+  annotate("point", x = 2.586255, y = 39.66033, color = "red")+
+  labs(subtitle = "{frame_along}")+
+  transition_reveal(time)+
+  anim_save("bikepath.gif")
+  
+  
+```
+
+```{r echo=FALSE}
+  knitr::include_graphics("bikepath.gif")
+```
   
   5. In this exercise, you get to meet my sister, Heather! She is a proud Mac grad, currently works as a Data Scientist at 3M where she uses R everyday, and for a few years (while still holding a full-time job) she was a pro triathlete. You are going to map one of her races. The data from each discipline of the Ironman 70.3 Pan Am championships, Panama is in a separate file - `panama_swim`, `panama_bike`, and `panama_run`. Create a similar map to the one you created with my cycling data. You will need to make some small changes: 1. combine the files (HINT: `bind_rows()`, 2. make the leading dot a different color depending on the event (for an extra challenge, make it a different image using `geom_image()!), 3. CHALLENGE (optional): color by speed, which you will need to compute on your own from the data. You can read Heather's race report [here](https://heatherlendway.com/2016/02/10/ironman-70-3-pan-american-championships-panama-race-report/). She is also in the Macalester Athletics [Hall of Fame](https://athletics.macalester.edu/honors/hall-of-fame/heather-lendway/184) and still has records at the pool. 
   
-```{r}
+```{r eval=FALSE}
 
 ```
-  
+
+```{r echo=FALSE}
+  knitr::include_graphics(".gif")
+```
+
 ## COVID-19 data
 
   6. In this exercise, you are going to replicate many of the features in [this](https://aatishb.com/covidtrends/?region=US) visualization by Aitish Bhatia but include all US states. Requirements:
