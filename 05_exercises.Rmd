@@ -12,7 +12,7 @@ output:
 
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r libraries}
@@ -83,7 +83,7 @@ Once your repository is created, you should always open your **project** rather 
 ## Warm-up exercises from tutorial
 
   1. Choose 2 graphs you have created for ANY assignment in this class and add interactivity using the `ggplotly()` function.
-```{r eval=FALSE}
+```{r}
 garden_graph <- garden_harvest %>% 
   filter(vegetable == "tomatoes") %>% 
   group_by(variety, date) %>%  
@@ -98,7 +98,7 @@ ggplotly(garden_graph)
 
 ```
 
-```{r eval=FALSE}
+```{r}
 states_map <- map_data("state")
 
 current_covid19 <- covid19 %>% 
@@ -197,22 +197,30 @@ tomatoes %>%
   * Add something of your own! And comment on if you prefer this to the static map and why or why not.
 
 ```{r eval=FALSE}
+library(ggimage)
+
+bike_image <- "https://raw.githubusercontent.com/llendway/animation_and_interactivity/master/bike.png"
+
 mallorca_bike_day7 <- mallorca_bike_day7 %>% 
-  replace_na(list(speed = 0)) 
+  replace_na(list(speed = 0)) %>% 
+  mutate(image = bike_image)
 
 bikepath <- get_stamenmap(
     bbox = c(left = 2.35, bottom = 39.5, right = 2.6, top = 39.75), 
     maptype = "terrain",
     zoom = 10)
 
-  ggmap(bikepath) + 
-  geom_path(data = mallorca_bike_day7, 
+ggmap(bikepath) + 
+geom_path(data = mallorca_bike_day7, 
              aes(x = lon, y = lat, color = ele), 
              size = 1)+
-  annotate("point", x = 2.586255, y = 39.66033, color = "red")+
-  labs(subtitle = "{frame_along}")+
-  transition_reveal(time)+
-  anim_save("bikepath.gif")
+geom_image(data = mallorca_bike_day7,
+           aes(image = image),
+             size = 0.1)+
+annotate("point", x = 2.586255, y = 39.66033, color = "red")+
+labs(subtitle = "{frame_along}")+
+transition_reveal(time)+
+anim_save("bikepath.gif")
   
   
 ```
@@ -224,11 +232,44 @@ bikepath <- get_stamenmap(
   5. In this exercise, you get to meet my sister, Heather! She is a proud Mac grad, currently works as a Data Scientist at 3M where she uses R everyday, and for a few years (while still holding a full-time job) she was a pro triathlete. You are going to map one of her races. The data from each discipline of the Ironman 70.3 Pan Am championships, Panama is in a separate file - `panama_swim`, `panama_bike`, and `panama_run`. Create a similar map to the one you created with my cycling data. You will need to make some small changes: 1. combine the files (HINT: `bind_rows()`, 2. make the leading dot a different color depending on the event (for an extra challenge, make it a different image using `geom_image()!), 3. CHALLENGE (optional): color by speed, which you will need to compute on your own from the data. You can read Heather's race report [here](https://heatherlendway.com/2016/02/10/ironman-70-3-pan-american-championships-panama-race-report/). She is also in the Macalester Athletics [Hall of Fame](https://athletics.macalester.edu/honors/hall-of-fame/heather-lendway/184) and still has records at the pool. 
   
 ```{r eval=FALSE}
+runner_image <- "05weeklyassignment-runner.png"
 
+swimmer_image <- "05weeklyassignment-swimmer.png"
+
+triathlon <- bind_rows(panama_bike, panama_run, panama_swim) %>% 
+  mutate(imagebike = bike_image) %>%
+  mutate(imagerun = runner_image) %>%
+  mutate(imageswim = swimmer_image) %>%
+  arrange(time) 
+
+map_bounds <- get_stamenmap(
+    bbox = c(left = -79.56, bottom = 8.91, right = -79.5, top = 8.99), 
+    maptype = "terrain",
+    zoom = 11)
+
+ggmap(map_bounds) + 
+geom_path(data = triathlon, 
+             aes(x = lon, y = lat, color = ele), 
+             size = 1)+
+  geom_image(data = triathlon %>% filter(event == "Bike"),
+           aes(image = imagebike),
+             size = 0.1)+
+  geom_image(data = triathlon %>% filter(event == "Swim"),
+           aes(image = imageswim),
+             size = 0.1)+
+  geom_image(data = triathlon %>% filter(event == "Run"),
+           aes(image = imagerun),
+             size = 0.1)+
+labs(title = "Heather's Trialthon",
+     subtitle = "{frame_along}",
+     x = "",
+     y = "")+
+transition_reveal(time)+
+anim_save("triathlon.gif")
 ```
 
 ```{r echo=FALSE}
-  knitr::include_graphics(".gif")
+knitr::include_graphics("triathlon.gif")
 ```
 
 ## COVID-19 data
@@ -241,14 +282,80 @@ bikepath <- get_stamenmap(
   * Use the `animate()` function to have 200 frames in your animation and make it 30 seconds long. 
   * Comment on what you observe.
   
+```{r eval=FALSE}
+covid_graph <-covid19 %>% 
+  group_by(state) %>% 
+  mutate(cases_lag_7day = lag(cases, 7, order_by = date)) %>% 
+  replace_na(list(cases_lag_7day = 0)) %>% 
+  filter(cases >= 20) %>% 
+  mutate(new_cases = cases - cases_lag_7day) %>% 
+  ggplot(aes(x = cases,
+             y = new_cases,
+             group = state))+
+  geom_path()+
+  geom_point()+
+  geom_text(aes(label = state),
+                check_overlap = T)+
+  scale_y_log10(labels = scales::comma)+
+  scale_x_log10(labels = scales::comma)+
+  transition_reveal(date)+
+  labs(title = "US COVID-19 Cases",
+      subtitle = "Date: {frame_along}",
+       x = "New Weekly Cases",
+       y = "Cumulative Cases")+
+  anim_save("covid_graph.gif")
+
+animate(covid_graph, 200, duration = 30)
+  
+```
+
+```{r echo=FALSE}
+knitr::include_graphics("covid_graph.gif")
+```
+
+In most states, when the cumulative number of cases reaches a high number, the number of new cases each week begins to decrese.
+
+
   7. In this exercise you will animate a map of the US, showing how cumulative COVID-19 cases per 10,000 residents has changed over time. This is similar to exercises 11 & 12 from the previous exercises, with the added animation! So, in the end, you should have something like the static map you made there, but animated over all the days. Put date in the subtitle. Comment on what you see. The code below gives the population estimates for each state. Because there are so many dates, you are going to only do the animation for all Fridays. So, use `wday()` to create a day of week variable and filter to all the Fridays. HINT: use `group = date` in `aes()`.
 
-```{r}
+```{r eval=FALSE}
 census_pop_est_2018 <- read_csv("https://www.dropbox.com/s/6txwv3b4ng7pepe/us_census_2018_state_pop_est.csv?dl=1") %>% 
   separate(state, into = c("dot","state"), extra = "merge") %>% 
   select(-dot) %>% 
   mutate(state = str_to_lower(state))
+
+states_map <- map_data("state")
+
+current_covid19 <- covid19 %>%
+  mutate(state = str_to_lower(state)) %>% 
+  left_join(census_pop_est_2018,
+            by = "state" )%>% 
+  mutate(covid_per_10000 = (cases/est_pop_2018)*10000) %>% 
+  mutate(weekdays = wday(date)) %>% 
+  filter(weekdays == 6)
+
+current_covid19 %>% 
+  ggplot() +
+  geom_map(map = states_map,
+          aes(map_id = state,
+               fill = covid_per_10000,
+              group = date)) +
+  scale_fill_viridis_c(option = "plasma")+
+  expand_limits(x = states_map$long, y = states_map$lat) +
+  theme_map() +
+  theme(legend.background = element_blank())+
+  transition_states(date)+
+  labs(title = "Cumulative COVID-19 Cases per 10000",
+       fill = "# of Cases",
+       caption = "Created by Charlie Tran",
+       subtitle = "Date: {closest_state}")+
+  anim_save("covid_map.gif")
 ```
+```{r echo=FALSE}
+knitr::include_graphics("covid_map.gif")
+```
+
+In the spring and summer the states with with the greatest number of COVID-19 cases per 10000 people, were mostly close to one another. By Fall time, The Mid-west states begin to have a significant amount of cumulative cases per 10000 people.
 
 ## Your first `shiny` app (for next week!)
 
